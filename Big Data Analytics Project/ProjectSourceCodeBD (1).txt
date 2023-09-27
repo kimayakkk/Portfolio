@@ -1,0 +1,634 @@
+Engineering Big Data:
+
+Project with Source code. 
+
+Big Data Analysis on YouTube Videos
+
+Name : Kimaya Khilare
+
+NUID: 002958773
+
+
+List of Analysis performed:
+
+
+Map Reduce Analysis:
+
+1) Minimum Comment count of Youtubereceived 
+This analysis gives a minimum count of comments received on each category of youtube videos
+
+2)Summarization of YouTube Video Views
+
+This analysis gives the summarization of Views with rate and comments 
+Here I also used the Custom Writable class 
+
+3) Average Youtube Video Rating
+
+This analysis gives the rating by mentioning the Video Id
+=======================================================================================
+
+
+
+//Merging the Youtube video dataset
+
+package mergedataset;
+
+import com.sun.org.apache.xerces.internal.xs.PSVIProvider;
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+/**
+* 
+* @author kimaya
+*/
+public class MergingCSVFile {
+	
+	public static void main(String[] args) throws IOException {
+		
+		Configuration config = new Configuration();
+                config.addResource(new Path("/home/kimayakhilare/Downloads/hadoop-2.7.3/etc/hadoop/core-site.xml"));
+                config.addResource(new Path("/home/kimayakhilare/Downloads/hadoop-2.7.3/etc/hadoop/hdfs-site.xml"));
+		FileSystem hdfs = FileSystem.get(config);
+		FileSystem local = FileSystem.getLocal(config);
+		Path inputDir = new Path(args[0]);
+		Path hdfsFile = new Path(args[1]);		
+		
+		try {
+			FileStatus[] inputFiles1 = local.listStatus(inputDir);	
+			FSDataOutputStream out = hdfs.create(hdfsFile);
+			for(int i = 0; i < inputFiles1.length; i++) {
+				System.out.println(inputFiles1[i].getPath().getName());
+				FSDataInputStream in = local.open(inputFiles1[i].getPath());
+				byte buffer[] = new byte[256];
+				
+				int bytesRead = 0;
+				while((bytesRead = in.read(buffer)) > 0) {
+					out.write(buffer, 0, bytesRead);
+				}
+				in.close();
+			
+			}
+		out.close();	
+		}
+		catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+}
+
+
+
+//-----------Source Code of Map Reduce-------// 
+
+
+package com.mycompany.minimumcomments_ytvideo;
+
+//import java.util.*;
+//import java.io.IOException;
+import java.io.IOException;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.conf.*;
+import org.apache.hadoop.io.*;
+//import org.apache.hadoop.mapred.*;
+import org.apache.hadoop.mapreduce.Job;
+//import org.apache.hadoop.util.*;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+/**
+ *
+ * @author kimaya
+ */
+public class minCommentscount_Driver {
+    public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException
+    {
+        Configuration config = new Configuration();
+        Job job1 = new Job(config, "minCommentscount");
+        job1.setJarByClass(minCommentscount_Driver.class);
+        
+        FileInputFormat.addInputPath(job1, new Path(args[0]));   //referencing the input files
+        FileOutputFormat.setOutputPath(job1, new Path(args[1])); //referencing the output files
+        
+      
+        job1.setInputFormatClass(TextInputFormat.class);   
+        job1.setOutputFormatClass(TextOutputFormat.class);
+        
+        job1.setMapOutputKeyClass(Text.class);
+        job1.setMapOutputValueClass(LongWritable.class);
+        
+        job1.setMapperClass(minCommentscount_Mapper.class);   //declaring the mapper class(mapper implementation are passed to job
+        job1.setReducerClass(minCommentscount_Reducer.class); //declaring the reducer class(Reducer implementation are passed to job
+        
+        job1.setOutputKeyClass(Text.class);             
+        job1.setOutputValueClass(LongWritable.class);    
+        
+        System.exit(job1.waitForCompletion(true)?0:1);  //submit the job to the cluster and wait for it to finish
+
+
+}
+}
+
+//Mapper class
+
+package com.mycompany.minimumcomments_ytvideo;
+
+//import java.util.*;
+//import java.io.IOException;
+import java.io.IOException;
+//import org.apache.hadoop.fs.Path;
+//import org.apache.hadoop.conf.*;
+import org.apache.hadoop.io.*;
+//import org.apache.hadoop.mapred.*;
+//import org.apache.hadoop.util.*;
+/**
+ *
+ * @author kimaya
+ */
+//mapper class
+public class minCommentscount_Mapper extends org.apache.hadoop.mapreduce.Mapper<LongWritable, Text, Text, LongWritable> 
+{
+	private final Text vidcategory=new Text();     //declaring category as a text input
+        //private final Text uploader_username=new Text();
+        private final LongWritable vidcomments=new LongWritable();  
+	@Override
+	protected void map(LongWritable key, Text value,Context context)throws IOException, InterruptedException {
+                String strline = value.toString();
+                String[] datain = strline.split(",");  //inputslit as file is delimited by ','
+           if((datain.length)>5)                      //
+           {
+                //uploader_username.set(data[1]);
+                vidcategory.set(datain[3]);
+                vidcomments.set(Long.parseLong(datain[8]));
+        	   
+           }
+           context.write(new Text(vidcategory), vidcomments);  //displaying the key as category and value as commenys
+        
+       	  
+		
+		
+	}
+}
+
+//reducer class
+
+*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.minimumcomments_ytvideo;
+
+//import java.util.*;
+//import java.io.IOException;
+import java.io.IOException;
+import org.apache.hadoop.io.*;
+
+/**
+ *
+ * @author kimaya
+ */
+public class minCommentscount_Reducer extends org.apache.hadoop.mapreduce.Reducer<Text, LongWritable, Text, LongWritable>{
+	
+	@Override
+	protected void reduce(Text category, Iterable<LongWritable> values,Context context)throws IOException, InterruptedException 
+        {
+		//long sum=0;
+                long minimum = 2000000000;
+                long sum;                   //declaring the sum with data type long
+                sum = 0;                    // initalizing it to zero
+                
+               for (LongWritable val1 : values) 
+               {
+                    sum = sum + val1.get();          
+               }
+                if (sum < minimum)             //checking the sum if its less then minimum
+                {
+        	minimum = sum;
+        	//finalKey = key.toString();
+                }
+		context.write(category, new LongWritable(minimum));  //printing the output of minimum comment count
+		
+	}
+
+}
+
+2)Summarization of Views 
+
+//Driver class
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Project/Maven2/JavaApp/src/main/java/${packagePath}/${mainClassName}.java to edit this template
+ */
+
+package com.mycompany.viewsummarization_youtube;
+//importing the libraries
+//import java.io.IOException;
+//import org.apache.hadoop.io.Text;
+//import org.apache.hadoop.mapreduce.Mapper;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+/**
+ *
+ * @author kimaya
+ */
+public class Views_Summarization_Youtube {
+
+    /**
+     * @param args the command line arguments
+     * @throws java.io.IOException
+     */
+    public static void main(String[] args) throws IOException {
+        try {
+            Configuration conf2 = new Configuration();
+            Job job = Job.getInstance(conf2, "VideoMinMaxView");   //cpnfiguring the job and sending it to nodemanager
+            job.setJarByClass(Views_Summarization_Youtube.class);
+            
+            job.setMapperClass(View_Mapper.class);          //declaring and setting the mapper class
+            job.setCombinerClass(View_Reducer.class);       //declaring and setting the combiner class
+            job.setReducerClass(View_Reducer.class);        //declaring and setting the reducer class
+            
+            job.setOutputKeyClass(Text.class);          //key is the text class
+            job.setOutputValueClass(MinMaxCountTuple.class);        //output value is the aggregation of minmaxcount tuple class
+            
+            FileInputFormat.addInputPath(job, new Path(args[0]));           //setting the input path of file
+            FileOutputFormat.setOutputPath(job, new Path(args[1]));         //setting tge output path of file
+            
+            System.exit(job.waitForCompletion(true) ? 0 : 1);
+        } catch (InterruptedException | ClassNotFoundException ex) {
+            Logger.getLogger(Views_Summarization_Youtube.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+}
+
+
+
+//mapper class
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.viewsummarization_youtube;
+import java.io.IOException;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+/**
+ *
+ * @author kimaya
+ */
+class View_Mapper extends Mapper<Object, Text, Text, MinMaxCountTuple> {
+
+    private final Text videoID = new Text();
+    private final MinMaxCountTuple outTuple1 = new MinMaxCountTuple();
+
+    @Override
+    protected void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+
+        String[] inpt = value.toString().split(",");  //inputsplit and spliting the delimited given by ','
+
+        videoID.set(inpt[0]);
+        if(inpt.length > 8) {
+        try {
+        outTuple1.setTotalView(Float.valueOf(inpt[5]));   //setting the value of view from tuple class in field
+        outTuple1.setAverageRate(Float.valueOf(inpt[6])); //setting the value of average rate from tuple class in field
+        outTuple1.setTotalComment(Float.valueOf(inpt[8])); //setting the values of comments from tuple class in field
+        //Float k = Float.valueOf(Integer.parseFloat(""))
+
+        context.write(videoID, outTuple1);
+        }catch(IOException | InterruptedException | NumberFormatException e) {
+        	e.getStackTrace();
+        }
+        }
+    }
+
+}
+
+//Reducer class
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.viewsummarization_youtube;
+import java.io.IOException;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Reducer;
+/**
+ *
+ * @author kimaya
+ */
+
+class View_Reducer extends Reducer<Text, MinMaxCountTuple, Text, MinMaxCountTuple> {
+
+    private MinMaxCountTuple res = new MinMaxCountTuple();
+
+    @Override
+    protected void reduce(Text key, Iterable<MinMaxCountTuple> values, Context context) throws IOException, InterruptedException {
+        // Initialize our result
+        res.setTotalView(0);
+        res.setAverageRate(0);
+        res.setTotalComment(0);
+        
+        int sum1 = 0;
+
+        for (MinMaxCountTuple vals : values) {
+            //calculating maximum total views
+            if (res.getTotalView()== 0 || vals.getTotalView() > (res.getTotalView())) {  //calculating the 
+                res.setTotalView(vals.getTotalView());
+            }
+            //calculating the average rate 
+                if (res.getAverageRate()== 0 || vals.getAverageRate() < res.getAverageRate()) {
+                res.setAverageRate(vals.getAverageRate());
+                
+            }
+            //sum
+            sum1 += vals.getTotalComment();
+
+        }
+        res.setTotalComment(sum1);
+        context.write(key, res);
+    }
+
+}
+
+//Tuple class
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.viewsummarization_youtube;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import org.apache.hadoop.io.Writable;
+/**
+ *
+ * @author kimaya
+ */
+public class MinMaxCountTuple implements Writable {
+    private float totalView;                        //declaring float datatype with variable totalView
+    private float averageRate;                      //declaring float datatype with variable averageRate
+    private float totalComment;                     ////declaring float datatype with variable totalComment
+
+  
+
+    public float getTotalView() {                   //Getter for total view
+        return totalView;
+    }
+
+    public void setTotalView(float totalView) {        //setter for total View
+        this.totalView = totalView;
+    }    
+    
+      public float getAverageRate() {             //getter method for averageRate
+        return averageRate;
+    }
+
+    public void setAverageRate(float averageRate) {
+        this.averageRate= averageRate;                      // setter method for averageRate
+    }
+    
+    public float getTotalComment() {
+        return totalComment;                        //getter for total comment
+    }
+
+    public void setTotalComment(float totalComment) {
+        this.totalComment = totalComment;                   //setter for total comment
+    }
+
+    //@Override
+    @Override
+    public void write(DataOutput d) throws IOException {
+        
+        d.writeFloat(totalView);
+        d.writeFloat(averageRate);
+        d.writeFloat(totalComment);
+
+    }
+
+    //@Override
+    @Override
+    public void readFields(DataInput di) throws IOException {
+        totalView = di.readFloat();
+        averageRate = di.readFloat();
+        totalComment = di.readFloat();
+
+    }
+
+    @Override
+    public String toString() {
+        return ( totalView + "\t" +  averageRate+ "\t" + totalComment);
+    }
+
+}
+
+
+
+3) Average Rating of Youtube Video 
+
+//driver class
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.averageyoutubevideorating;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+//import org.apache.hadoop.mapreduce.Mapper;
+//import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+/**
+ *
+ * @author kimaya
+ */
+public class AvgYT_Driver
+{
+    @SuppressWarnings("deprecation")
+ public static void main(String[] args) throws Exception {
+        Configuration conf1 = new Configuration();
+        
+        Job job1 = Job.getInstance(conf1, "Top15");
+        job1.setJarByClass(AvgYT_Driver.class);   //declared the driverclass 
+        job1.setMapperClass(AvgYT_Mapper.class);     //Mapper class declared
+        job1.setReducerClass(AvgYT_Reducer.class); //Reducer class declared
+                
+        job1.setOutputKeyClass(Text.class);
+        job1.setOutputValueClass(FloatWritable.class);
+        
+        //Configuring the input/output path from filesystem into job
+        FileInputFormat.addInputPath(job1, new Path(args[0]));      //adding the input file
+        FileOutputFormat.setOutputPath(job1, new Path(args[1]));    // the output file
+        
+        
+        System.exit(job1.waitForCompletion(true) ? 0 : 1);
+    }
+}
+
+//mapper class
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.averageyoutubevideorating;
+
+import java.io.IOException;
+import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+/**
+ *
+ * @author kimaya
+ */
+
+public class AvgYT_Mapper extends Mapper<Object, Text, Text, FloatWritable>
+{
+
+        private FloatWritable videorating = new FloatWritable(1);
+        private Text videoid = new Text();
+        
+        @Override
+        public void map(Object key, Text value, Mapper.Context context
+        ) throws IOException, InterruptedException {
+
+            String[] fields = value.toString().split(",");      //splitting the line by ","
+            videoid = new Text(fields[0]);
+            try {
+            if(fields.length > 6)                                   //checking if the row has more than 6 columns
+            {                                                       //Mapper class is emitting videoID and rating
+            
+                videorating = new FloatWritable(Float.parseFloat(fields[7]));
+            }
+            
+            context.write(videoid, videorating);
+            }catch (IOException | InterruptedException | NumberFormatException e) {
+                //if its greater than 6 then it will throw the exception
+                
+}
+        }
+    }
+
+//reducer class
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.averageyoutubevideorating;
+
+import java.io.IOException;
+//import org.apache.hadoop.conf.Configuration;
+//import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.Text;
+//import org.apache.hadoop.mapreduce.Job;
+//import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+//import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+//import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+/**
+ *
+ * @author kimaya
+ */
+public class AvgYT_Reducer extends Reducer <Text, FloatWritable,Text, FloatWritable> 
+{
+     private FloatWritable res = new FloatWritable();
+     
+    @Override
+    public void reduce(Text key, Iterable<FloatWritable> values1, Context context) throws IOException, InterruptedException
+    {
+            int cnt = 0;   //initializing count to 0
+            float sum = 0;
+            float average = 0;
+            // calculates the number of occurance in single word
+           
+            for (FloatWritable vals : values1) 
+            {    
+                sum += vals.get();
+                ++cnt;
+            }
+            average = sum / cnt;
+            res.set(average);
+            context.write(key, res);
+            //context.write(key,new FloatWritable(sum));
+            
+        }
+}
+
+
+// Analysis with Pig Scripts
+
+
+1)Top 15 Viewed by  Category
+ytfiles = load '/home/kimaya/Desktop/YTDB/YouTube_Dataset.csv' using PigStorage(',') as 
+(videoid:chararray,uploader:chararray,age:int,category:chararray,length:int,views:int,rate:int,rating:int,comments:int,related_id:chararray);
+files = FILTER ytfiles BY category is not null;
+top15catagories = group files by category;
+top15_viewedcatagories = foreach top15catagories{
+                           sorted = order files by views asc;
+                           top15 = limit sorted 15;
+                           generate flatten(top15);
+};
+top15_viewed_by_catagories = foreach top15_viewedcatagories generate $0,$3,$5;
+STORE top15_viewed_by_catagories INTO '/home/kimaya/Pigscripts/Top15Viewed_ByCatagories' using PigStorage('|');
+
+
+2)Least 5 Categories
+
+ytfiles = load '/home/kimaya/Desktop/YTDB/YouTube_Dataset.csv' using PigStorage(',') as 
+(videoid:chararray,uploader:chararray,age:int,category:chararray,length:int,views:int,rate:int,rating:int,comments:int,related_id:chararray);
+info = FILTER ytfiles BY category is not null;
+catGrp = group info by category;
+category_occurance = foreach catGrp generate group, COUNT(info.videoid) as counting;
+sortedCategory_asc = order category_occurance by counting asc;
+least5_catagories = limit sortedCategory_asc 5;
+STORE least5_catagories INTO  '/home/kimaya/Desktop/Pigscripts_final/Least5Catagories' using PigStorage('|');
+
+3)5 bad rated Youtube video:
+
+Ratefile = load '/home/kimaya/Desktop/YTDB/YouTube_Dataset.csv' using PigStorage(',') as
+(videoid:chararray,uploader:chararray,age:int,category:chararray,length:int,views:int,rate:int,rating:int,comments:int,related_id:chararray);
+files_rate = FILTER Ratefile BY category is not null;
+video_rated = order files_rate by rating asc;
+bad5_rated_video = limit video_rated 5;
+bad5Ratedvideo = foreach bad5_rated_video generate $0,$3,$7;
+STORE bad5Ratedvideo INTO  '/home/kimaya/Documents/Pigscripts_final/Bad5RatedVideo' using PigStorage('|');
+
+//Analysis with Hive
+
+1)	Calculating Top 10 Category of YouTube videos
+
+hive> LOAD DATA LOCAL INPATH '/home/kimaya/Desktop/YTDB/YouTube_Dataset.csv' OVERWRITE INTO TABLE ytvideo_info_table;
+hive> select vidcategory, count(*) as count_videos from ytvideo_info_table group by vidcategory sort by count_videos desc limit 10;
+
+
+2)	Calculate TOP 15 lengthy Video
+hive> select idvideo,vidcategory,vidlength from YTVideo_info_table SORT BY vidlength DESC LIMIT 15;
+
+3)	 Calculate top 10 channels with maximum number of comments
+Hive> select idvideo,uploader_name,total_comments FROM ytvideo_info_table ORDER BY total_comments DESC LIMIT 10;
+
+
+
+
+
